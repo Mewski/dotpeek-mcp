@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>DotPeekMcp.Protocol</AssemblyName>
+    <RootNamespace>DotPeekMcp.Protocol</RootNamespace>
+    <TargetFramework></TargetFramework>
+    <TargetFrameworks>net472;net10.0</TargetFrameworks>
+    <DotPeekInstallDir Condition="'$(DotPeekInstallDir)' == ''">$(LOCALAPPDATA)\JetBrains\Installations\dotPeek261</DotPeekInstallDir>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <Reference Include="System.Text.Json">
+      <HintPath>$(DotPeekInstallDir)\System.Text.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>DotPeekMcp.Plugin</AssemblyName>
+    <RootNamespace>DotPeekMcp.Plugin</RootNamespace>
+    <TargetFramework>net472</TargetFramework>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <DotPeekInstallDir Condition="'$(DotPeekInstallDir)' == ''">$(LOCALAPPDATA)\JetBrains\Installations\dotPeek261</DotPeekInstallDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DotPeekMcp.Protocol\DotPeekMcp.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="JetBrains.Lifetimes">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.Lifetimes.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="JetBrains.DotPeek.Common">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.DotPeek.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="JetBrains.Platform.ComponentModel">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.Platform.ComponentModel.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="JetBrains.Platform.Shell">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.Platform.Shell.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Text.Json">
+      <HintPath>$(DotPeekInstallDir)\System.Text.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Memory">
+      <HintPath>$(DotPeekInstallDir)\System.Memory.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Collections.Immutable">
+      <HintPath>$(DotPeekInstallDir)\System.Collections.Immutable.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Reflection.Metadata">
+      <HintPath>$(DotPeekInstallDir)\System.Reflection.Metadata.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

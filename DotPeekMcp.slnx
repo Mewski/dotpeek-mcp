@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/DotPeekMcp.Protocol/DotPeekMcp.Protocol.csproj" />
+  <Project Path="src/DotPeekMcp.Plugin/DotPeekMcp.Plugin.csproj" />
+  <Project Path="src/DotPeekMcp.Proxy/DotPeekMcp.Proxy.csproj" />
+</Solution>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>dotpeek-mcp</AssemblyName>
+    <RootNamespace>DotPeekMcp.Proxy</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DotPeekMcp.Protocol\DotPeekMcp.Protocol.csproj" />
+  </ItemGroup>
+</Project>
