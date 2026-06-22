@@ -1,10 +1,4 @@
-using DotPeekMcp.Protocol;
-using DotPeekMcp.Proxy.Bridge;
-using DotPeekMcp.Proxy.Mcp;
-
-var bridgeUri = GetBridgeUri(args);
-var bridgeClient = new DotPeekBridgeClient(bridgeUri);
-var server = new McpServer(Console.OpenStandardInput(), Console.OpenStandardOutput(), bridgeClient);
+using DotPeekMcp.Proxy.Cli;
 
 using var shutdown = new CancellationTokenSource();
 Console.CancelKeyPress += (_, eventArgs) => {
@@ -12,14 +6,4 @@ Console.CancelKeyPress += (_, eventArgs) => {
   shutdown.Cancel();
 };
 
-await server.RunAsync(shutdown.Token).ConfigureAwait(false);
-
-static Uri GetBridgeUri(string[] args) {
-  for (var index = 0; index < args.Length; index++) {
-    if (args[index] == "--bridge-url" && index + 1 < args.Length) {
-      return new Uri(args[index + 1], UriKind.Absolute);
-    }
-  }
-
-  return BridgeDefaults.GetDefaultBaseUri();
-}
+Environment.ExitCode = await DotPeekMcpCli.RunAsync(args, Console.Out, Console.Error, shutdown.Token).ConfigureAwait(false);

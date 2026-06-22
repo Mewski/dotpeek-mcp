@@ -1,130 +1,131 @@
 # dotpeek-mcp
 
-MCP access to JetBrains dotPeek through the dotPeek GUI/plugin model.
+MCP server for JetBrains dotPeek.
 
-This project intentionally follows the `ida-pro-mcp` GUI-plugin shape: dotPeek stays open, a plugin runs in the dotPeek process, and a small external MCP proxy forwards MCP client requests into that plugin.
+`dotpeek-mcp` loads a plugin into the dotPeek GUI process and exposes dotPeek operations through a stdio MCP proxy. The proxy only handles MCP framing and forwards requests to the in-process plugin bridge.
 
-## Shape
+## Prerequisites
 
-- `src/DotPeekMcp.Plugin`: dotPeek plugin loaded as an ad-hoc deployed package.
-- `src/DotPeekMcp.Proxy`: stdio MCP proxy for MCP clients.
-- `src/DotPeekMcp.Protocol`: shared tool catalog and bridge message contracts.
+- [.NET SDK](https://dotnet.microsoft.com/download) 10.0 or newer.
+- [JetBrains dotPeek](https://www.jetbrains.com/decompiler/) 2026.1 or newer.
+- An MCP client that supports stdio servers.
 
-The proxy does not decompile assemblies. All dotPeek work must happen inside `DotPeekMcp.Plugin` using dotPeek/JetBrains APIs.
+## Installation
 
-## Current Status
+Install from the repository root:
 
-Implemented:
+```powershell
+dotnet run --project src\DotPeekMcp.Proxy -- install
+```
 
-- Buildable .NET solution: the dotPeek plugin targets `net472` for JetBrains component-catalog compatibility, while the stdio proxy targets `net10.0`.
-- dotPeek plugin startup component with a JetBrains zone marker.
-- Localhost bridge inside the plugin on `127.0.0.1:8767`.
-- MCP stdio framing in the proxy.
-- `tools/list` with the dotPeek MCP tool surface.
-- `dotpeek_health` bridge/tool path.
-- Metadata-backed assembly sessions inside the dotPeek plugin.
-- Implementations for all declared tools:
-  - `dotpeek_open_assembly`
-  - `dotpeek_list_assemblies`
-  - `dotpeek_survey_assembly`
-  - `dotpeek_list_types`
-  - `dotpeek_search_symbols`
-  - `dotpeek_decompile_type` using JetBrains dotPeek decompiler output with metadata-stub fallback diagnostics.
-  - `dotpeek_decompile_member` using the member's native-decompiled declaring type with metadata-stub fallback diagnostics.
-  - `dotpeek_export_project`
-  - `dotpeek_list_resources`
+The installer builds the solution, publishes the proxy, copies the dotPeek plugin, writes dotPeek's deployed-package file, and writes an MCP config snippet under:
 
-Current limitations:
+```text
+%LOCALAPPDATA%\JetBrains\dotpeek-mcp\mcp.json
+```
 
-- `dotpeek_open_assembly` registers assemblies in the plugin session model; it does not yet mirror them into dotPeek's Assembly Explorer UI.
-- `dotpeek_decompile_member` returns the native-decompiled declaring type as `source` and marks `source_scope = "declaring_type"`; it does not yet slice the exact member body out of that source.
-- `dotpeek_export_project` writes metadata-backed declaration stubs and a small project shell. It does not yet call dotPeek's Export to Project pipeline or generate PDBs.
+If dotPeek is not auto-detected, pass the executable path:
 
-The next implementation step is connecting safe Assembly Explorer UI mirroring and dotPeek Export to Project services once the required solution-level services are mapped reliably.
+```powershell
+dotnet run --project src\DotPeekMcp.Proxy -- install --dotpeek "C:\Path\To\dotPeek64.exe"
+```
 
-## Tool Behavior
+## Run dotPeek
 
-- `dotpeek_open_assembly`: validates a PE/CLR assembly path, reads metadata without loading the target assembly into dotPeek's AppDomain, and returns a stable `asm_N` session ID.
-- `dotpeek_list_assemblies`: returns all assemblies opened through the plugin bridge.
-- `dotpeek_survey_assembly`: returns counts, type-kind breakdowns, top namespaces, references, and resources.
-- `dotpeek_list_types`: returns paged type summaries. Optional arguments: `filter`, `offset`, `count`.
-- `dotpeek_search_symbols`: searches opened assemblies for matching types and members. Optional arguments: `assembly`, `count`.
-- `dotpeek_decompile_type`: returns `mode = "dotpeek_decompiler"` and native dotPeek C# output when available. If the native path fails, returns `mode = "metadata_stub"` with `native_error` and `native_diagnostics`.
-- `dotpeek_decompile_member`: returns `mode = "dotpeek_decompiler"`, `source_scope = "declaring_type"`, and native dotPeek C# output for the member's declaring type when available. If the native path fails, returns `mode = "metadata_stub"` with `native_error` and `native_diagnostics`. Use member tokens from search results to disambiguate overloads.
-- `dotpeek_export_project`: returns `mode = "metadata_stubs"` and writes generated `.metadata.cs` files plus a project file to an empty output directory.
-- `dotpeek_list_resources`: returns manifest resources from assembly metadata.
+Start dotPeek through the installed proxy so the plugin package is loaded:
 
-## Build
+```powershell
+& "$env:LOCALAPPDATA\JetBrains\dotpeek-mcp\proxy\dotpeek-mcp.exe" launch --wait
+```
+
+`--wait` returns only after the plugin bridge and native dotPeek services are available.
+
+## MCP Config
+
+Print the MCP client config:
+
+```powershell
+& "$env:LOCALAPPDATA\JetBrains\dotpeek-mcp\proxy\dotpeek-mcp.exe" config
+```
+
+Generic stdio config:
+
+```json
+{
+  "mcpServers": {
+    "dotpeek": {
+      "command": "C:\\Users\\YOU\\AppData\\Local\\JetBrains\\dotpeek-mcp\\proxy\\dotpeek-mcp.exe",
+      "args": []
+    }
+  }
+}
+```
+
+## Test
+
+With dotPeek running through `launch --wait`:
+
+```powershell
+& "$env:LOCALAPPDATA\JetBrains\dotpeek-mcp\proxy\dotpeek-mcp.exe" test --create-pdb
+```
+
+The test command checks bridge health, Assembly Explorer open, metadata survey, symbol search, native type decompilation, member extraction, and native Export to Project/PDB.
+
+## Commands
+
+- `dotpeek-mcp`: start the stdio MCP proxy.
+- `dotpeek-mcp install`: build and install the plugin/proxy bundle.
+- `dotpeek-mcp launch`: start dotPeek with the plugin package enabled.
+- `dotpeek-mcp config`: print the MCP config JSON.
+- `dotpeek-mcp test`: run an end-to-end bridge/tool test.
+- `dotpeek-mcp uninstall`: remove the local install root.
+
+## Tools
+
+- `dotpeek_health`: probe the plugin bridge and native dotPeek services.
+- `dotpeek_open_assembly`: open an assembly in dotPeek Assembly Explorer and create an MCP assembly session.
+- `dotpeek_list_assemblies`: list opened assembly sessions.
+- `dotpeek_survey_assembly`: return a compact assembly metadata overview.
+- `dotpeek_list_types`: list types with pagination and optional filtering.
+- `dotpeek_search_symbols`: search types and members.
+- `dotpeek_decompile_type`: return native dotPeek C# output for a type.
+- `dotpeek_decompile_member`: return extracted native dotPeek C# output for a member when a safe span is found.
+- `dotpeek_export_project`: run dotPeek Export to Project with optional solution and PDB generation.
+- `dotpeek_list_resources`: list manifest resources.
+
+## Development
+
+Build:
 
 ```powershell
 dotnet build DotPeekMcp.slnx
 ```
 
-Stop dotPeek before rebuilding after a launch; the running process locks `DotPeekMcp.Plugin.dll`.
-
-## Format
-
-Formatting is controlled by `.editorconfig` and uses 2-space indentation.
-
-Apply formatting:
-
-```powershell
-dotnet format DotPeekMcp.slnx whitespace
-```
-
-Check formatting without changing files:
+Format check:
 
 ```powershell
 dotnet format DotPeekMcp.slnx whitespace --verify-no-changes
 ```
 
-The plugin project defaults to this dotPeek install path:
+Stop dotPeek before rebuilding after a plugin launch because dotPeek locks loaded plugin assemblies.
 
-```text
-%LOCALAPPDATA%\JetBrains\Installations\dotPeek261
-```
-
-Override it with MSBuild if needed:
+If your dotPeek installation is not under `%LOCALAPPDATA%\JetBrains\Installations`, pass the install directory to MSBuild:
 
 ```powershell
 dotnet build DotPeekMcp.slnx -p:DotPeekInstallDir="C:\Path\To\dotPeek"
 ```
 
-## Run
+## Architecture
 
-Start dotPeek with the plugin loaded:
+- `DotPeekMcp.Plugin`: dotPeek plugin loaded as an ad-hoc deployed package.
+- `DotPeekMcp.Proxy`: stdio MCP proxy and product CLI.
+- `DotPeekMcp.Protocol`: shared tool catalog and bridge contracts.
 
-```powershell
-.\scripts\Start-DotPeekMcp.ps1
-```
+The plugin listens on `127.0.0.1:8767` by default. Override the bridge with `DOTPEEK_MCP_BRIDGE_URL` or `DOTPEEK_MCP_BRIDGE_PORT`.
 
-Current dotPeek builds load plugins as deployed packages. The launch script writes an ad-hoc package XML file for `src\DotPeekMcp.Plugin\bin\Debug\net472` and sets `JET_ADDITIONAL_DEPLOYED_PACKAGES_FILE` before starting dotPeek.
+## Troubleshooting
 
-Then configure an MCP client to run the stdio proxy:
-
-```powershell
-dotnet run --project src\DotPeekMcp.Proxy --no-build
-```
-
-The proxy connects to the plugin bridge at `http://127.0.0.1:8767/` by default.
-
-Override the bridge URL:
-
-```powershell
-dotnet run --project src\DotPeekMcp.Proxy --no-build -- --bridge-url http://127.0.0.1:8767/
-```
-
-Or set environment variables:
-
-```powershell
-$env:DOTPEEK_MCP_BRIDGE_URL = "http://127.0.0.1:8767/"
-$env:DOTPEEK_MCP_BRIDGE_PORT = "8767"
-```
-
-## Design Rules
-
-- DotPeek is the implementation target. There is no ILSpy or generic decompiler backend.
-- The plugin owns dotPeek API calls because those calls run in the dotPeek process.
-- The proxy only speaks MCP and forwards tool calls.
-- Tool responses should stay structured and explicit, following the `ida-pro-mcp` style.
-- Add batch/pagination before returning potentially large results.
+- If an MCP client cannot connect, start dotPeek with `dotpeek-mcp launch --wait` first.
+- If builds fail because DLLs are locked, stop dotPeek and rebuild.
+- If dotPeek is not detected, pass `--dotpeek "C:\Path\To\dotPeek64.exe"` to `install` or `launch`.
+- Plugin logs are written to `%LOCALAPPDATA%\JetBrains\dotpeek-mcp\plugin.log`.

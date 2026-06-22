@@ -15,7 +15,7 @@ public static class ToolCatalog {
   public static IReadOnlyList<ToolDefinition> All { get; } = new ToolDefinition[]
   {
     new(Health, "Probe the dotPeek MCP plugin running inside the dotPeek GUI.", EmptyObjectSchema()),
-    new(OpenAssembly, "Register an assembly in the dotPeek MCP plugin and read CLR metadata.", ObjectSchema(
+    new(OpenAssembly, "Open an assembly in dotPeek Assembly Explorer and read CLR metadata for MCP queries.", ObjectSchema(
       Required("path"),
       StringProperty("path", "Assembly path to open."))),
     new(ListAssemblies, "List assemblies currently visible to the dotPeek plugin.", EmptyObjectSchema()),
@@ -37,11 +37,11 @@ public static class ToolCatalog {
       Required("assembly", "type"),
       StringProperty("assembly", "Assembly session ID or path returned by dotpeek_open_assembly."),
       StringProperty("type", "Full metadata type name."))),
-    new(DecompileMember, "Return dotPeek decompiler output for a member's declaring type, with metadata-stub fallback diagnostics.", ObjectSchema(
+    new(DecompileMember, "Return dotPeek decompiler output for a member, with declaring-type and metadata-stub fallbacks.", ObjectSchema(
       Required("assembly", "member"),
       StringProperty("assembly", "Assembly session ID or path returned by dotpeek_open_assembly."),
       StringProperty("member", "Member metadata name, signature, or token."))),
-    new(ExportProject, "Export metadata-backed C# declaration stubs for an assembly.", ObjectSchema(
+    new(ExportProject, "Run dotPeek Export to Project for an assembly, optionally generating a solution and PDB.", ObjectSchema(
       Required("assembly", "output_directory"),
       StringProperty("assembly", "Assembly session ID or path returned by dotpeek_open_assembly."),
       StringProperty("output_directory", "Destination directory."),

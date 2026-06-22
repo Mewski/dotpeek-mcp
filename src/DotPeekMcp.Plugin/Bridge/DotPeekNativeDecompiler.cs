@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 using DotPeekMcp.Plugin.Metadata;
@@ -10,13 +9,13 @@ internal sealed class DotPeekNativeDecompiler {
 
   public NativeDecompilerStatus GetStatus() {
     try {
-      _ = RequireType("JetBrains.Lifetimes", "JetBrains.Lifetimes.Lifetime");
-      _ = RequireType("JetBrains.Platform.Core", "JetBrains.Application.Progress.ProgressIndicator");
-      _ = RequireType("JetBrains.Platform.Core", "JetBrains.Util.FileSystemPath");
-      _ = RequireType("JetBrains.Platform.Metadata", "JetBrains.Metadata.Reader.API.MetadataLoader");
-      _ = RequireType("JetBrains.Platform.Metadata", "JetBrains.Metadata.Reader.API.AssemblyLocationEx");
-      _ = RequireType("JetBrains.ReSharper.Feature.Services.ExternalSources", "JetBrains.ReSharper.Feature.Services.ExternalSources.MetadataTranslator.MetadataTranslatorOptions");
-      _ = RequireType("JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp", "JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp.MetadataTranslator.CSharpMetadataTranslator");
+      _ = JetBrainsReflection.RequireType("JetBrains.Lifetimes", "JetBrains.Lifetimes.Lifetime");
+      _ = JetBrainsReflection.RequireType("JetBrains.Platform.Core", "JetBrains.Application.Progress.ProgressIndicator");
+      _ = JetBrainsReflection.RequireType("JetBrains.Platform.Core", "JetBrains.Util.FileSystemPath");
+      _ = JetBrainsReflection.RequireType("JetBrains.Platform.Metadata", "JetBrains.Metadata.Reader.API.MetadataLoader");
+      _ = JetBrainsReflection.RequireType("JetBrains.Platform.Metadata", "JetBrains.Metadata.Reader.API.AssemblyLocationEx");
+      _ = JetBrainsReflection.RequireType("JetBrains.ReSharper.Feature.Services.ExternalSources", "JetBrains.ReSharper.Feature.Services.ExternalSources.MetadataTranslator.MetadataTranslatorOptions");
+      _ = JetBrainsReflection.RequireType("JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp", "JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp.MetadataTranslator.CSharpMetadataTranslator");
       return new NativeDecompilerStatus {
         available = true,
         mode = "dotpeek_decompiler"
@@ -26,7 +25,7 @@ internal sealed class DotPeekNativeDecompiler {
       return new NativeDecompilerStatus {
         available = false,
         mode = "unavailable",
-        error = FormatException(exception)
+        error = JetBrainsReflection.FormatException(exception)
       };
     }
   }
@@ -37,15 +36,13 @@ internal sealed class DotPeekNativeDecompiler {
       object? loader = null;
 
       try {
-        var lifetimeType = RequireType("JetBrains.Lifetimes", "JetBrains.Lifetimes.Lifetime");
-        var progressIndicatorType = RequireType("JetBrains.Platform.Core", "JetBrains.Application.Progress.ProgressIndicator");
-        var fileSystemPathType = RequireType("JetBrains.Platform.Core", "JetBrains.Util.FileSystemPath");
-        var virtualFileSystemPathType = RequireType("JetBrains.Platform.Core", "JetBrains.Util.VirtualFileSystemPath");
-        var metadataLoaderType = RequireType("JetBrains.Platform.Metadata", "JetBrains.Metadata.Reader.API.MetadataLoader");
-        var metadataTypeInfoType = RequireType("JetBrains.Platform.Metadata", "JetBrains.Metadata.Reader.API.IMetadataTypeInfo");
-        var assemblyLocationExType = RequireType("JetBrains.Platform.Metadata", "JetBrains.Metadata.Reader.API.AssemblyLocationEx");
-        var optionsType = RequireType("JetBrains.ReSharper.Feature.Services.ExternalSources", "JetBrains.ReSharper.Feature.Services.ExternalSources.MetadataTranslator.MetadataTranslatorOptions");
-        var translatorType = RequireType("JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp", "JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp.MetadataTranslator.CSharpMetadataTranslator");
+        var lifetimeType = JetBrainsReflection.RequireType("JetBrains.Lifetimes", "JetBrains.Lifetimes.Lifetime");
+        var progressIndicatorType = JetBrainsReflection.RequireType("JetBrains.Platform.Core", "JetBrains.Application.Progress.ProgressIndicator");
+        var virtualFileSystemPathType = JetBrainsReflection.RequireType("JetBrains.Platform.Core", "JetBrains.Util.VirtualFileSystemPath");
+        var metadataLoaderType = JetBrainsReflection.RequireType("JetBrains.Platform.Metadata", "JetBrains.Metadata.Reader.API.MetadataLoader");
+        var metadataTypeInfoType = JetBrainsReflection.RequireType("JetBrains.Platform.Metadata", "JetBrains.Metadata.Reader.API.IMetadataTypeInfo");
+        var optionsType = JetBrainsReflection.RequireType("JetBrains.ReSharper.Feature.Services.ExternalSources", "JetBrains.ReSharper.Feature.Services.ExternalSources.MetadataTranslator.MetadataTranslatorOptions");
+        var translatorType = JetBrainsReflection.RequireType("JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp", "JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp.MetadataTranslator.CSharpMetadataTranslator");
 
         var lifetime = lifetimeType.GetProperty("Eternal", BindingFlags.Public | BindingFlags.Static)?.GetValue(null)
             ?? throw new InvalidOperationException("JetBrains Lifetime.Eternal property was not found.");
@@ -58,7 +55,7 @@ internal sealed class DotPeekNativeDecompiler {
         loader = loaderConstructor.Invoke(new object[] { folderArray });
 
         diagnostics.Add("metadata_loader_resolver=empty_folders");
-        var assemblyLocation = CreateAssemblyLocation(fileSystemPathType, assemblyLocationExType, session.Path);
+        var assemblyLocation = JetBrainsReflection.CreateAssemblyLocation(session.Path);
         var metadataAssembly = LoadMetadataAssembly(loader, assemblyLocation);
         if (metadataAssembly is null) {
           return NativeDecompilerResult.Failed("JetBrains MetadataLoader returned null for " + session.Path, diagnostics);
@@ -87,7 +84,7 @@ internal sealed class DotPeekNativeDecompiler {
         return NativeDecompilerResult.Succeeded(source, diagnostics);
       }
       catch (Exception exception) {
-        return NativeDecompilerResult.Failed(FormatException(exception), diagnostics);
+        return NativeDecompilerResult.Failed(JetBrainsReflection.FormatException(exception), diagnostics);
       }
       finally {
         (loader as IDisposable)?.Dispose();
@@ -104,25 +101,6 @@ internal sealed class DotPeekNativeDecompiler {
 
     return Activator.CreateInstance(optionsType)
         ?? throw new InvalidOperationException("Could not create MetadataTranslatorOptions.");
-  }
-
-  private static object CreateAssemblyLocation(Type fileSystemPathType, Type assemblyLocationExType, string path) {
-    var internStrategyType = RequireType("JetBrains.Platform.Core", "JetBrains.Util.FileSystemPathInternStrategy");
-    var parseMethod = fileSystemPathType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), internStrategyType }, null)
-        ?? throw new InvalidOperationException("FileSystemPath.Parse(string, FileSystemPathInternStrategy) was not found.");
-    var fileSystemPath = parseMethod.Invoke(null, new[] { path, Enum.ToObject(internStrategyType, 0) })
-        ?? throw new InvalidOperationException("FileSystemPath.Parse returned null for " + path + ".");
-    var toAssemblyLocation = assemblyLocationExType
-        .GetMethods(BindingFlags.Public | BindingFlags.Static)
-        .FirstOrDefault(method => {
-          var parameters = method.GetParameters();
-          return method.Name == "ToAssemblyLocation"
-              && parameters.Length == 1
-              && parameters[0].ParameterType == fileSystemPathType;
-        }) ?? throw new InvalidOperationException("AssemblyLocationEx.ToAssemblyLocation(FileSystemPath) was not found.");
-
-    return toAssemblyLocation.Invoke(null, new[] { fileSystemPath })
-        ?? throw new InvalidOperationException("AssemblyLocationEx.ToAssemblyLocation returned null for " + path + ".");
   }
 
   private static object? LoadMetadataAssembly(object loader, object assemblyLocation) {
@@ -212,81 +190,6 @@ internal sealed class DotPeekNativeDecompiler {
         && parameters[2].ParameterType == optionsType;
   }
 
-  private static object CreateVirtualPathArray(Type virtualFileSystemPathType, IReadOnlyList<string> folders, List<string> diagnostics) {
-    var paths = new List<object>();
-    foreach (var folder in folders) {
-      try {
-        paths.Add(ParseVirtualPath(virtualFileSystemPathType, folder));
-      }
-      catch (Exception exception) {
-        diagnostics.Add("ignored_search_folder=" + folder + " error=" + FormatException(exception));
-      }
-    }
-
-    if (paths.Count == 0) {
-      throw new InvalidOperationException("No JetBrains VirtualFileSystemPath search folders could be created.");
-    }
-
-    var array = Array.CreateInstance(virtualFileSystemPathType, paths.Count);
-    for (var i = 0; i < paths.Count; i++) {
-      array.SetValue(paths[i], i);
-    }
-
-    diagnostics.Add("search_folder_count=" + paths.Count);
-    return array;
-  }
-
-  private static object ParseVirtualPath(Type virtualFileSystemPathType, string path) {
-    var internStrategyType = RequireType("JetBrains.Platform.Core", "JetBrains.Util.FileSystemPathInternStrategy");
-    var parseMethod = virtualFileSystemPathType
-        .GetMethods(BindingFlags.Public | BindingFlags.Static)
-        .FirstOrDefault(method => {
-          var parameters = method.GetParameters();
-          return method.Name == "Parse"
-              && parameters.Length == 3
-              && parameters[0].ParameterType == typeof(string);
-        }) ?? throw new InvalidOperationException("VirtualFileSystemPath.Parse(string, ..., FileSystemPathInternStrategy) was not found.");
-
-    return parseMethod.Invoke(null, new[] { path, null, Enum.ToObject(internStrategyType, 0) })
-        ?? throw new InvalidOperationException("VirtualFileSystemPath.Parse returned null for " + path + ".");
-  }
-
-  private static IReadOnlyList<string> BuildSearchFolders(string assemblyPath) {
-    var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    AddDirectory(folders, Path.GetDirectoryName(assemblyPath));
-    AddDirectory(folders, Path.GetDirectoryName(typeof(object).Assembly.Location));
-    AddDirectory(folders, AppDomain.CurrentDomain.BaseDirectory);
-    AddDirectory(folders, Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty));
-
-    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-      var name = assembly.GetName().Name ?? string.Empty;
-      if (!name.StartsWith("JetBrains.", StringComparison.Ordinal)
-          && !name.StartsWith("System.", StringComparison.Ordinal)
-          && !name.StartsWith("Microsoft.", StringComparison.Ordinal)) {
-        continue;
-      }
-
-      AddDirectory(folders, SafeAssemblyDirectory(assembly));
-    }
-
-    return folders.ToArray();
-  }
-
-  private static string SafeAssemblyDirectory(Assembly assembly) {
-    try {
-      return Path.GetDirectoryName(assembly.Location) ?? string.Empty;
-    }
-    catch (NotSupportedException) {
-      return string.Empty;
-    }
-  }
-
-  private static void AddDirectory(HashSet<string> folders, string? directory) {
-    if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory)) {
-      folders.Add(directory!);
-    }
-  }
-
   private static Delegate CreateTrueDelegate(Type delegateType) {
     var invoke = delegateType.GetMethod("Invoke")
         ?? throw new InvalidOperationException("Delegate type has no Invoke method: " + delegateType.FullName);
@@ -294,47 +197,6 @@ internal sealed class DotPeekNativeDecompiler {
     return Expression.Lambda(delegateType, Expression.Constant(true), parameter).Compile();
   }
 
-  private static Type RequireType(string assemblyName, string typeName) {
-    var assembly = AppDomain.CurrentDomain.GetAssemblies()
-        .FirstOrDefault(candidate => string.Equals(candidate.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase));
-
-    assembly ??= LoadJetBrainsAssembly(assemblyName);
-    return assembly.GetType(typeName, true)
-        ?? throw new InvalidOperationException("Type was not found: " + typeName);
-  }
-
-  private static Assembly LoadJetBrainsAssembly(string assemblyName) {
-    try {
-      return Assembly.Load(assemblyName);
-    }
-    catch {
-      var dllName = assemblyName + ".dll";
-      foreach (var directory in GetAssemblyProbeDirectories()) {
-        var path = Path.Combine(directory, dllName);
-        if (File.Exists(path)) {
-          return Assembly.LoadFrom(path);
-        }
-      }
-
-      throw;
-    }
-  }
-
-  private static IEnumerable<string> GetAssemblyProbeDirectories() {
-    var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    AddDirectory(directories, AppDomain.CurrentDomain.BaseDirectory);
-    AddDirectory(directories, Path.GetDirectoryName(typeof(DotPeekNativeDecompiler).Assembly.Location));
-    AddDirectory(directories, Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty));
-    return directories;
-  }
-
-  private static string FormatException(Exception exception) {
-    if (exception is TargetInvocationException { InnerException: { } inner }) {
-      exception = inner;
-    }
-
-    return exception.GetType().Name + ": " + exception.Message;
-  }
 }
 
 internal sealed class NativeDecompilerResult {

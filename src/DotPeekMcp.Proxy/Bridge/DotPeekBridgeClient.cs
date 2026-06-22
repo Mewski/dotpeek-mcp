@@ -5,7 +5,7 @@ using DotPeekMcp.Protocol;
 
 namespace DotPeekMcp.Proxy.Bridge;
 
-internal sealed class DotPeekBridgeClient {
+internal sealed class DotPeekBridgeClient : IDisposable {
   private readonly Uri _baseUri;
   private readonly HttpClient _httpClient;
 
@@ -41,5 +41,9 @@ internal sealed class DotPeekBridgeClient {
     catch (JsonException exception) {
       return BridgeToolResult.FromError("bridge_invalid_json", exception.Message);
     }
+  }
+
+  public void Dispose() {
+    _httpClient.Dispose();
   }
 }

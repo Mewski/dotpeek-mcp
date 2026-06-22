@@ -11,6 +11,9 @@ internal sealed class DotPeekToolDispatcher {
   private readonly MetadataSourceWriter _sourceWriter = new();
   private readonly MetadataProjectExporter _projectExporter = new();
   private readonly DotPeekNativeDecompiler _nativeDecompiler = new();
+  private readonly DotPeekAssemblyExplorer _assemblyExplorer = new();
+  private readonly DotPeekNativeProjectExporter _nativeProjectExporter = new();
+  private readonly NativeMemberSourceExtractor _memberSourceExtractor = new();
 
   public BridgeToolResult Dispatch(BridgeToolCall call) {
     if (string.IsNullOrWhiteSpace(call.Name)) {
@@ -64,6 +67,8 @@ internal sealed class DotPeekToolDispatcher {
       bridge_url = BridgeDefaults.GetDefaultBaseUri().ToString(),
       open_assemblies = _assemblies.List().Length,
       native_decompiler = _nativeDecompiler.GetStatus(),
+      assembly_explorer = _assemblyExplorer.GetStatus(),
+      native_export = _nativeProjectExporter.GetStatus(),
       tools = ToolCatalog.All.Select(tool => tool.Name).ToArray()
     };
 
@@ -73,9 +78,12 @@ internal sealed class DotPeekToolDispatcher {
   private BridgeToolResult OpenAssembly(JsonElement arguments) {
     var path = RequiredString(arguments, "path");
     var session = _assemblies.Open(path);
+    var explorer = _assemblyExplorer.TryOpen(session);
     return BridgeToolResult.FromData(new {
-      mode = "metadata",
-      gui_opened = false,
+      mode = explorer.GuiOpened ? "dotpeek_assembly_explorer" : "metadata",
+      gui_opened = explorer.GuiOpened,
+      gui_error = explorer.Success ? string.Empty : explorer.Error,
+      gui_diagnostics = explorer.Diagnostics,
       assembly = ToAssemblySummary(session)
     });
   }
@@ -241,14 +249,17 @@ internal sealed class DotPeekToolDispatcher {
     var match = matches[0];
     var native = _nativeDecompiler.TryDecompileType(session, match.Type);
     if (native.Success) {
+      var extracted = _memberSourceExtractor.TryExtract(native.Source, match.Type, match.Member);
       return BridgeToolResult.FromData(new {
         mode = native.Mode,
-        source_scope = "declaring_type",
+        source_scope = extracted.Success ? "member" : "declaring_type",
         assembly = ToAssemblySummary(session),
         type = ToTypeSummary(match.Type),
         member = match.Member,
-        source = native.Source,
-        native_diagnostics = native.Diagnostics
+        source = extracted.Success ? extracted.Source : native.Source,
+        declaring_type_source = extracted.Success ? native.Source : null,
+        native_diagnostics = native.Diagnostics,
+        extraction_diagnostics = extracted.Diagnostics
       });
     }
 
@@ -268,10 +279,28 @@ internal sealed class DotPeekToolDispatcher {
     var outputDirectory = RequiredString(arguments, "output_directory");
     var createSolution = OptionalBool(arguments, "create_solution", false);
     var createPdb = OptionalBool(arguments, "create_pdb", false);
+    var native = _nativeProjectExporter.TryExport(session, outputDirectory, createSolution, createPdb);
+    if (native.Success) {
+      return BridgeToolResult.FromData(new {
+        mode = "dotpeek_export_project",
+        assembly = ToAssemblySummary(session),
+        output_directory = native.OutputDirectory,
+        project_path = string.IsNullOrEmpty(native.ProjectPath) ? null : native.ProjectPath,
+        solution_path = string.IsNullOrEmpty(native.SolutionPath) ? null : native.SolutionPath,
+        pdb_path = string.IsNullOrEmpty(native.PdbPath) ? null : native.PdbPath,
+        written_file_count = native.WrittenFiles.Length,
+        written_files = native.WrittenFiles.Take(100).ToArray(),
+        written_files_truncated = native.WrittenFiles.Length > 100,
+        native_diagnostics = native.Diagnostics
+      });
+    }
+
     var result = _projectExporter.Export(session, outputDirectory, createSolution, createPdb);
     return BridgeToolResult.FromData(new {
       mode = "metadata_stubs",
       assembly = ToAssemblySummary(session),
+      native_error = native.Error,
+      native_diagnostics = native.Diagnostics,
       output_directory = result.OutputDirectory,
       project_path = result.ProjectPath,
       solution_path = string.IsNullOrEmpty(result.SolutionPath) ? null : result.SolutionPath,

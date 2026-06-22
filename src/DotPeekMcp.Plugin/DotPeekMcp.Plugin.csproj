@@ -28,6 +28,30 @@
       <HintPath>$(DotPeekInstallDir)\JetBrains.Platform.Shell.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="JetBrains.Platform.Core">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.Platform.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="JetBrains.Platform.ProjectModel">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.Platform.ProjectModel.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="JetBrains.Platform.Metadata">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.Platform.Metadata.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="JetBrains.ReSharper.ExternalSources">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.ReSharper.ExternalSources.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="JetBrains.ReSharper.Feature.Services.ExternalSources">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.ReSharper.Feature.Services.ExternalSources.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp">
+      <HintPath>$(DotPeekInstallDir)\JetBrains.ReSharper.Feature.Services.ExternalSources.CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="System.Text.Json">
       <HintPath>$(DotPeekInstallDir)\System.Text.Json.dll</HintPath>
       <Private>false</Private>

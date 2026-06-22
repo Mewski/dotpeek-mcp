@@ -13,11 +13,13 @@ internal sealed class McpServer {
   private readonly Stream _input;
   private readonly Stream _output;
   private readonly DotPeekBridgeClient _bridgeClient;
+  private readonly string _version;
 
-  public McpServer(Stream input, Stream output, DotPeekBridgeClient bridgeClient) {
+  public McpServer(Stream input, Stream output, DotPeekBridgeClient bridgeClient, string version) {
     _input = input;
     _output = output;
     _bridgeClient = bridgeClient;
+    _version = version;
   }
 
   public async Task RunAsync(CancellationToken cancellationToken) {
@@ -49,7 +51,7 @@ internal sealed class McpServer {
         },
         serverInfo = new {
           name = "dotpeek-mcp",
-          version = "0.1.0"
+          version = _version
         }
       }),
       "notifications/initialized" => null,
@@ -100,13 +102,12 @@ internal sealed class McpServer {
 
     return new {
       content = new[]
-        {
-                new
-                {
-                    type = "text",
-                    text
-                }
-            },
+      {
+        new {
+          type = "text",
+          text
+        }
+      },
       isError = !bridgeResult.Success
     };
   }
