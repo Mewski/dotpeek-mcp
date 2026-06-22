@@ -12,7 +12,13 @@ MCP server for JetBrains dotPeek.
 
 ## Installation
 
-Install from the repository root:
+Download `dotpeek-mcp-win-x64.zip` from the latest release and extract it to:
+
+```text
+%LOCALAPPDATA%\JetBrains\dotpeek-mcp
+```
+
+Or install from the repository root:
 
 ```powershell
 dotnet run --project src\DotPeekMcp.Proxy -- install
@@ -129,3 +135,7 @@ The plugin listens on `127.0.0.1:8767` by default. Override the bridge with `DOT
 - If builds fail because DLLs are locked, stop dotPeek and rebuild.
 - If dotPeek is not detected, pass `--dotpeek "C:\Path\To\dotPeek64.exe"` to `install` or `launch`.
 - Plugin logs are written to `%LOCALAPPDATA%\JetBrains\dotpeek-mcp\plugin.log`.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

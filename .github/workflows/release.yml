@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install dotPeek
+        shell: pwsh
+        run: |
+          choco install dotpeek -y --no-progress
+          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Resolve dotPeek installation
+        shell: pwsh
+        run: |
+          $roots = @(
+            "$env:LOCALAPPDATA\JetBrains\Installations",
+            "$env:ProgramFiles\JetBrains\Installations",
+            "${env:ProgramFiles(x86)}\JetBrains\Installations"
+          ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+
+          $dotPeek = Get-ChildItem -LiteralPath $roots -Directory -Filter "dotPeek*" -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName "dotPeek64.exe" } |
+            Where-Object { Test-Path -LiteralPath $_ } |
+            Select-Object -First 1
+
+          if (-not $dotPeek) {
+            throw "dotPeek64.exe was not found after installation."
+          }
+
+          $dotPeekInstallDir = Split-Path -Parent $dotPeek
+          "DOTPEEK_INSTALL_DIR=$dotPeekInstallDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "DotPeekInstallDir=$dotPeekInstallDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "dotPeek: $dotPeek"
+
+      - name: Build
+        run: dotnet build DotPeekMcp.slnx -c Release -p:DotPeekInstallDir="${{ env.DOTPEEK_INSTALL_DIR }}"
+
+      - name: Publish proxy
+        run: dotnet publish src/DotPeekMcp.Proxy/DotPeekMcp.Proxy.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o package/proxy
+
+      - name: Package plugin
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path package/plugin -Force | Out-Null
+          Copy-Item src/DotPeekMcp.Plugin/bin/Release/net472/DotPeekMcp.Plugin.dll package/plugin/
+          Copy-Item src/DotPeekMcp.Plugin/bin/Release/net472/DotPeekMcp.Protocol.dll package/plugin/
+          & "package/proxy/dotpeek-mcp.exe" config | Out-File package/mcp.json -Encoding utf8
+          Copy-Item README.md package/
+          Copy-Item LICENSE package/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotpeek-mcp-win-x64
+          path: package/**
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release archives
+        run: |
+          cd artifacts/dotpeek-mcp-win-x64
+          zip -r ../../dotpeek-mcp-win-x64.zip *
+          cd ../..
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dotpeek-mcp-win-x64.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false

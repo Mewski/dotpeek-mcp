@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  proxy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore src/DotPeekMcp.Proxy/DotPeekMcp.Proxy.csproj
+
+      - name: Build
+        run: dotnet build src/DotPeekMcp.Proxy/DotPeekMcp.Proxy.csproj -c Release --no-restore
+
+      - name: Check CLI
+        run: dotnet run --project src/DotPeekMcp.Proxy -- --help
+
+      - name: Check MCP config output
+        run: dotnet run --project src/DotPeekMcp.Proxy -- config
+
+  plugin:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install dotPeek
+        shell: pwsh
+        run: |
+          choco install dotpeek -y --no-progress
+          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Resolve dotPeek installation
+        shell: pwsh
+        run: |
+          $roots = @(
+            "$env:LOCALAPPDATA\JetBrains\Installations",
+            "$env:ProgramFiles\JetBrains\Installations",
+            "${env:ProgramFiles(x86)}\JetBrains\Installations"
+          ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+
+          $dotPeek = Get-ChildItem -LiteralPath $roots -Directory -Filter "dotPeek*" -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName "dotPeek64.exe" } |
+            Where-Object { Test-Path -LiteralPath $_ } |
+            Select-Object -First 1
+
+          if (-not $dotPeek) {
+            throw "dotPeek64.exe was not found after installation."
+          }
+
+          $dotPeekInstallDir = Split-Path -Parent $dotPeek
+          "DOTPEEK_INSTALL_DIR=$dotPeekInstallDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "DotPeekInstallDir=$dotPeekInstallDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "dotPeek: $dotPeek"
+
+      - name: Restore
+        run: dotnet restore DotPeekMcp.slnx
+
+      - name: Verify formatting
+        run: dotnet format DotPeekMcp.slnx whitespace --verify-no-changes --verbosity minimal
+
+      - name: Build
+        run: dotnet build DotPeekMcp.slnx -c Release --no-restore -p:DotPeekInstallDir="${{ env.DOTPEEK_INSTALL_DIR }}"
+
+      - name: Publish proxy
+        run: dotnet publish src/DotPeekMcp.Proxy/DotPeekMcp.Proxy.csproj -c Release --no-self-contained -o package/proxy
+
+      - name: Package plugin
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path package/plugin -Force | Out-Null
+          Copy-Item src/DotPeekMcp.Plugin/bin/Release/net472/DotPeekMcp.Plugin.dll package/plugin/
+          Copy-Item src/DotPeekMcp.Plugin/bin/Release/net472/DotPeekMcp.Protocol.dll package/plugin/
+          & "package/proxy/dotpeek-mcp.exe" config | Out-File package/mcp.json -Encoding utf8
+          Copy-Item README.md package/
+          Copy-Item LICENSE package/
+
+      - name: Check packaged CLI
+        shell: pwsh
+        run: '& "package/proxy/dotpeek-mcp.exe" --help'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotpeek-mcp-windows-x64
+          path: package/**
