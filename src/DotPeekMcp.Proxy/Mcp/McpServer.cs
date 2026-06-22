@@ -14,12 +14,19 @@ internal sealed class McpServer {
   private readonly Stream _output;
   private readonly DotPeekBridgeClient _bridgeClient;
   private readonly string _version;
+  private readonly Func<CancellationToken, Task>? _beforeToolCall;
 
-  public McpServer(Stream input, Stream output, DotPeekBridgeClient bridgeClient, string version) {
+  public McpServer(
+      Stream input,
+      Stream output,
+      DotPeekBridgeClient bridgeClient,
+      string version,
+      Func<CancellationToken, Task>? beforeToolCall = null) {
     _input = input;
     _output = output;
     _bridgeClient = bridgeClient;
     _version = version;
+    _beforeToolCall = beforeToolCall;
   }
 
   public async Task RunAsync(CancellationToken cancellationToken) {
@@ -90,6 +97,15 @@ internal sealed class McpServer {
     var arguments = parameters.TryGetProperty("arguments", out var argumentsElement)
         ? argumentsElement
         : emptyArguments.RootElement;
+
+    if (_beforeToolCall is not null) {
+      try {
+        await _beforeToolCall(cancellationToken).ConfigureAwait(false);
+      }
+      catch (Exception exception) when (exception is not OperationCanceledException) {
+        return Response(id, ToMcpToolResult(BridgeToolResult.FromError("dotpeek_launch_failed", exception.Message)));
+      }
+    }
 
     var bridgeResult = await _bridgeClient.CallToolAsync(name, arguments, cancellationToken).ConfigureAwait(false);
     return Response(id, ToMcpToolResult(bridgeResult));

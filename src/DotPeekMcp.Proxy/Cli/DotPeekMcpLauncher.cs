@@ -9,7 +9,7 @@ internal static class DotPeekMcpLauncher {
     var installRoot = DotPeekMcpPaths.ResolveInstallRoot(options);
     var pluginDir = options.GetOption(DotPeekMcpPaths.GetPluginDir(installRoot), "--plugin-dir");
     var packagesFile = DotPeekMcpPaths.GetPackagesFile(installRoot);
-    var dotPeekPath = DotPeekMcpPaths.ResolveDotPeekPath(options);
+    var dotPeekPath = DotPeekMcpPaths.ResolveDotPeekPath(options, installRoot);
 
     DotPeekMcpPaths.WritePackageFile(pluginDir, packagesFile);
 
@@ -17,14 +17,7 @@ internal static class DotPeekMcpLauncher {
       StopDotPeek();
     }
 
-    var startInfo = new ProcessStartInfo(dotPeekPath) {
-      UseShellExecute = false,
-      WorkingDirectory = Path.GetDirectoryName(dotPeekPath) ?? Environment.CurrentDirectory
-    };
-    startInfo.Environment["JET_ADDITIONAL_DEPLOYED_PACKAGES_FILE"] = packagesFile;
-
-    using var process = Process.Start(startInfo)
-        ?? throw new InvalidOperationException("Failed to start dotPeek: " + dotPeekPath);
+    StartDotPeek(dotPeekPath, packagesFile);
     await stdout.WriteLineAsync("Started dotPeek with JET_ADDITIONAL_DEPLOYED_PACKAGES_FILE=" + packagesFile).ConfigureAwait(false);
 
     if (options.HasFlag("--wait")) {
@@ -34,6 +27,54 @@ internal static class DotPeekMcpLauncher {
     }
 
     return 0;
+  }
+
+  private static void StartDotPeek(string dotPeekPath, string packagesFile) {
+    var startInfo = new ProcessStartInfo(dotPeekPath) {
+      UseShellExecute = false,
+      WorkingDirectory = Path.GetDirectoryName(dotPeekPath) ?? Environment.CurrentDirectory
+    };
+    startInfo.Environment["JET_ADDITIONAL_DEPLOYED_PACKAGES_FILE"] = packagesFile;
+
+    using var _ = Process.Start(startInfo)
+        ?? throw new InvalidOperationException("Failed to start dotPeek: " + dotPeekPath);
+  }
+
+  public static async Task EnsureBridgeReadyOrLaunchAsync(
+      CommandLine options,
+      TextWriter stderr,
+      CancellationToken cancellationToken) {
+    try {
+      await WaitForBridgeAsync(TimeSpan.FromSeconds(2), requireNativeServices: true, cancellationToken).ConfigureAwait(false);
+      return;
+    }
+    catch (TimeoutException) {
+    }
+
+    if (options.HasFlag("--no-auto-launch")) {
+      return;
+    }
+
+    var installRoot = DotPeekMcpPaths.ResolveInstallRoot(options);
+    var pluginDir = options.GetOption(DotPeekMcpPaths.GetPluginDir(installRoot), "--plugin-dir");
+    var packagesFile = DotPeekMcpPaths.GetPackagesFile(installRoot);
+    var dotPeekPath = DotPeekMcpPaths.ResolveDotPeekPath(options, installRoot);
+    var timeoutSeconds = options.GetIntOption(60, "--auto-launch-timeout");
+
+    DotPeekMcpPaths.WritePackageFile(pluginDir, packagesFile);
+
+    await stderr.WriteLineAsync("[dotpeek-mcp] dotPeek bridge is not running; starting dotPeek.").ConfigureAwait(false);
+    StartDotPeek(dotPeekPath, packagesFile);
+
+    try {
+      var health = await WaitForBridgeAsync(TimeSpan.FromSeconds(timeoutSeconds), requireNativeServices: true, cancellationToken).ConfigureAwait(false);
+      await stderr.WriteLineAsync("[dotpeek-mcp] dotPeek MCP bridge is ready: process_id=" + health.ProcessId).ConfigureAwait(false);
+    }
+    catch (TimeoutException exception) when (Process.GetProcessesByName("dotPeek64").Length > 0) {
+      throw new TimeoutException(
+        exception.Message + " If dotPeek was already running without the plugin package, close it and run `dotpeek-mcp launch --wait` once.",
+        exception);
+    }
   }
 
   public static void StopDotPeek() {

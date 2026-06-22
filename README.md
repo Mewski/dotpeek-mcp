@@ -2,7 +2,7 @@
 
 MCP server for JetBrains dotPeek.
 
-`dotpeek-mcp` loads a plugin into the dotPeek GUI process and exposes dotPeek operations through a stdio MCP proxy. The proxy only handles MCP framing and forwards requests to the in-process plugin bridge.
+`dotpeek-mcp` loads a plugin into the dotPeek GUI process and exposes dotPeek operations through a stdio MCP proxy. MCP clients start the proxy; the proxy starts dotPeek automatically when the plugin bridge is not already running.
 
 ## Prerequisites
 
@@ -37,6 +37,10 @@ dotnet run --project src\DotPeekMcp.Proxy -- install --dotpeek "C:\Path\To\dotPe
 ```
 
 ## Run dotPeek
+
+MCP clients can start `dotpeek-mcp.exe` directly. The proxy starts dotPeek automatically if needed and then keeps serving MCP over stdio.
+
+You can also start dotPeek manually:
 
 Start dotPeek through the installed proxy so the plugin package is loaded:
 
@@ -131,7 +135,7 @@ The plugin listens on `127.0.0.1:8767` by default. Override the bridge with `DOT
 
 ## Troubleshooting
 
-- If an MCP client cannot connect, start dotPeek with `dotpeek-mcp launch --wait` first.
+- If an MCP client cannot connect, run `dotpeek-mcp launch --wait` once to verify dotPeek can load the plugin.
 - If builds fail because DLLs are locked, stop dotPeek and rebuild.
 - If dotPeek is not detected, pass `--dotpeek "C:\Path\To\dotPeek64.exe"` to `install` or `launch`.
 - Plugin logs are written to `%LOCALAPPDATA%\JetBrains\dotpeek-mcp\plugin.log`.

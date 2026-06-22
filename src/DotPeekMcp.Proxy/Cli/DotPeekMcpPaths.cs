@@ -14,7 +14,7 @@ internal static class DotPeekMcpPaths {
       options.GetOption(DefaultInstallRoot, "--install-root")));
   }
 
-  public static string ResolveDotPeekPath(CommandLine options) {
+  public static string ResolveDotPeekPath(CommandLine options, string? installRoot = null) {
     var configuredPath = options.GetOption(string.Empty, "--dotpeek");
     if (!string.IsNullOrWhiteSpace(configuredPath)) {
       var fullPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(configuredPath));
@@ -25,12 +25,25 @@ internal static class DotPeekMcpPaths {
       return fullPath;
     }
 
-    var installRoot = Path.Combine(LocalAppData, "JetBrains", "Installations");
-    if (!Directory.Exists(installRoot)) {
-      throw new DirectoryNotFoundException("JetBrains install root was not found: " + installRoot);
+    if (!string.IsNullOrWhiteSpace(installRoot)) {
+      var manifestPath = GetManifestFile(installRoot);
+      if (File.Exists(manifestPath)) {
+        using var manifest = JsonDocument.Parse(File.ReadAllBytes(manifestPath));
+        if (manifest.RootElement.TryGetProperty("dotpeek_path", out var dotPeekPath)
+            && dotPeekPath.ValueKind == JsonValueKind.String
+            && dotPeekPath.GetString() is { Length: > 0 } path
+            && File.Exists(path)) {
+          return path;
+        }
+      }
     }
 
-    var candidates = Directory.EnumerateDirectories(installRoot, "dotPeek*")
+    var jetBrainsInstallRoot = Path.Combine(LocalAppData, "JetBrains", "Installations");
+    if (!Directory.Exists(jetBrainsInstallRoot)) {
+      throw new DirectoryNotFoundException("JetBrains install root was not found: " + jetBrainsInstallRoot);
+    }
+
+    var candidates = Directory.EnumerateDirectories(jetBrainsInstallRoot, "dotPeek*")
         .Select(path => new DirectoryInfo(path))
         .Select(directory => new {
           Directory = directory,
@@ -42,7 +55,7 @@ internal static class DotPeekMcpPaths {
         .ToArray();
 
     if (candidates.Length == 0) {
-      throw new FileNotFoundException("No dotPeek64.exe was found under " + installRoot + ". Pass --dotpeek explicitly.");
+      throw new FileNotFoundException("No dotPeek64.exe was found under " + jetBrainsInstallRoot + ". Pass --dotpeek explicitly.");
     }
 
     return candidates[0].Executable;

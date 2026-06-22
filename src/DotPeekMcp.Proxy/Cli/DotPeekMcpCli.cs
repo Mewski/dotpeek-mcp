@@ -32,7 +32,7 @@ internal static class DotPeekMcpCli {
       var options = new CommandLine(commandArgs);
 
       return command switch {
-        "stdio" or "serve" => await RunStdioServerAsync(options, cancellationToken).ConfigureAwait(false),
+        "stdio" or "serve" => await RunStdioServerAsync(options, stderr, cancellationToken).ConfigureAwait(false),
         "install" => await DotPeekMcpInstaller.InstallAsync(options, stdout, stderr, cancellationToken).ConfigureAwait(false),
         "launch" => await DotPeekMcpLauncher.LaunchAsync(options, stdout, cancellationToken).ConfigureAwait(false),
         "config" => await PrintConfigAsync(options, stdout).ConfigureAwait(false),
@@ -50,9 +50,14 @@ internal static class DotPeekMcpCli {
     }
   }
 
-  private static async Task<int> RunStdioServerAsync(CommandLine options, CancellationToken cancellationToken) {
+  private static async Task<int> RunStdioServerAsync(CommandLine options, TextWriter stderr, CancellationToken cancellationToken) {
     using var bridgeClient = new DotPeekBridgeClient(GetBridgeUri(options));
-    var server = new McpServer(Console.OpenStandardInput(), Console.OpenStandardOutput(), bridgeClient, GetVersion());
+    var server = new McpServer(
+      Console.OpenStandardInput(),
+      Console.OpenStandardOutput(),
+      bridgeClient,
+      GetVersion(),
+      token => DotPeekMcpLauncher.EnsureBridgeReadyOrLaunchAsync(options, stderr, token));
     await server.RunAsync(cancellationToken).ConfigureAwait(false);
     return 0;
   }
@@ -92,13 +97,13 @@ internal static class DotPeekMcpCli {
     output.WriteLine("dotpeek-mcp");
     output.WriteLine();
     output.WriteLine("Usage:");
-    output.WriteLine("  dotpeek-mcp [--bridge-url URL]");
+    output.WriteLine("  dotpeek-mcp [--bridge-url URL] [--no-auto-launch]");
     output.WriteLine("  dotpeek-mcp install [--dotpeek PATH] [--install-root PATH] [--configuration Release] [--self-contained]");
     output.WriteLine("  dotpeek-mcp launch [--dotpeek PATH] [--install-root PATH] [--wait] [--no-stop]");
     output.WriteLine("  dotpeek-mcp config [--install-root PATH]");
     output.WriteLine("  dotpeek-mcp test [--assembly PATH] [--create-pdb] [--skip-export]");
     output.WriteLine("  dotpeek-mcp uninstall [--install-root PATH] [--stop]");
     output.WriteLine();
-    output.WriteLine("Default mode is stdio MCP proxying to the dotPeek plugin bridge.");
+    output.WriteLine("Default mode is stdio MCP proxying to the dotPeek plugin bridge. It auto-starts dotPeek when needed.");
   }
 }
